@@ -11,7 +11,7 @@ Yanfly.Message = Yanfly.Message || {};
 
 //=============================================================================
  /*:
- * @plugindesc v1.02 Adds more features to the Message Window to customized
+ * @plugindesc v1.03a Adds more features to the Message Window to customized
  * the way your messages appear and functions.
  * @author Yanfly Engine Plugins
  *
@@ -276,6 +276,13 @@ Yanfly.Message = Yanfly.Message || {};
  * Changelog
  * ============================================================================
  *
+ * Version 1.03a:
+ * - Timed Name Window's closing speed with main window's closing speed.
+ *
+ * Verison 1.03:
+ * - Fixed a bug with textcodes that messed up wordwrapping.
+ * - Fixed a bug with font reset, italic, and bold textcodes.
+ *
  * Version 1.02:
  * - Namebox Window's overlap feature that's in every MV window is now disabled
  * to allow for overlapping with main message window.
@@ -469,6 +476,10 @@ Window_Base.prototype.setWordWrap = function(text) {
 };
 
 Window_Base.prototype.convertExtraEscapeCharacters = function(text) {
+		// Font Codes
+		text = text.replace(/\x1bFR/gi, '\x1bMSGCORE[0]');
+		text = text.replace(/\x1bFB/gi, '\x1bMSGCORE[1]');
+		text = text.replace(/\x1bFI/gi, '\x1bMSGCORE[2]');
 		// \AC[n]
 		text = text.replace(/\x1bAC\[(\d+)\]/gi, function() {
 				return this.actorClassName(parseInt(arguments[1]));
@@ -575,9 +586,12 @@ Yanfly.Message.Window_Base_processEscapeCharacter =
 		Window_Base.prototype.processEscapeCharacter;
 Window_Base.prototype.processEscapeCharacter = function(code, textState) {
 		switch (code) {
-		case 'FR':
-        this.resetFontSettings();
-        break;
+		case 'MSGCORE':
+				var id = this.obtainEscapeParam(textState);
+				if (id === 0) this.resetFontSettings();
+				if (id === 1) this.contents.fontBold = !this.contents.fontBold;
+				if (id === 2) this.contents.fontItalic = !this.contents.fontItalic;
+				break;
 		case 'FS':
         this.contents.fontSize = this.obtainEscapeParam(textState);
         break;
@@ -585,12 +599,6 @@ Window_Base.prototype.processEscapeCharacter = function(code, textState) {
 				var name = this.obtainEscapeString(textState);
 				this.contents.fontFace = name;
         break;
-		case 'FB':
-				this.contents.fontBold = !this.contents.fontBold;
-				break;
-		case 'FI':
-				this.contents.fontItalic = !this.contents.fontItalic;
-				break;
 		case 'OC':
 				var id = this.obtainEscapeParam(textState);
         this.contents.outlineColor = this.textColor(id);
@@ -638,7 +646,7 @@ Window_Base.prototype.checkWordWrap = function(textState) {
 			if (nextSpace < 0) nextSpace = textState.text.length + 1;
 			if (nextBreak > 0) nextSpace = Math.min(nextSpace, nextBreak);
 			var word = textState.text.substring(textState.index, nextSpace);
-			var size = this.textWidth(word);
+			var size = this.textWidthExCheck(word);
 		}
 		return (size + textState.x > this.contents.width);
 };
@@ -840,6 +848,9 @@ Window_NameBox.prototype.update = function() {
 		if (this.isClosed()) return;
 		if (this.isClosing()) return;
 		if (this._closeCounter-- > 0) return;
+		if (this._parentWindow.isClosing()) {
+			this._openness = this._parentWindow.openness;
+		}
 		this.close();
 };
 
