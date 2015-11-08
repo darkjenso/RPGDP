@@ -11,7 +11,7 @@ Yanfly.ASP1 = Yanfly.ASP1 || {};
 
 //=============================================================================
  /*:
- * @plugindesc v1.03 (Requires YEP_BattleEngineCore.js) Basic functions are
+ * @plugindesc v1.07 (Requires YEP_BattleEngineCore.js) Basic functions are
  * added to the Battle Engine Core's action sequences.
  * @author Yanfly Engine Plugins
  *
@@ -125,6 +125,7 @@ Yanfly.ASP1 = Yanfly.ASP1 || {};
  *   dead actors: This will select only dead actors.
  *   actors not user; This will select all living actors except for the user.
  *   actor x; This will select the actor in slot x.
+ *   character x; This will select the specific character with actor ID x.
  *   enemies, existing enemies; This will select all living enemies.
  *   all enemies; This will select all enemies, even dead.
  *   dead enemies: This will select only dead enemies.
@@ -696,6 +697,19 @@ Yanfly.ASP1 = Yanfly.ASP1 || {};
  * Changelog
  * ============================================================================
  *
+ * Version 1.07:
+ * - Fixed a bug with the forcing a Collapse action sequence.
+ *
+ * Version 1.06:
+ * - If using the Add State action sequence to add the Death state, it will
+ * remove immortality settings.
+ *
+ * Version 1.05:
+ * - Optimized status window to refresh at a minimum.
+ *
+ * Version 1.04:
+ * - Updated help file to include Character X for target typing.
+ *
  * Version 1.03:
  * - Fixed a bug that didn't make the sounds played work properly (again).
  *
@@ -885,13 +899,10 @@ BattleManager.actionAddBuff = function(actionName, actionArgs) {
     var turns = 5;
   }
   if (paramId < 0) return true;
-  var refresh = false;
   targets.forEach(function(target) {
     target.addBuff(paramId, turns);
     if (show) this._logWindow.displayActionResults(this._subject, target);
-    if (target.isActor()) refresh = true;
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -914,13 +925,10 @@ BattleManager.actionAddDebuff = function(actionName, actionArgs) {
     var turns = 5;
   }
   if (paramId < 0) return true;
-  var refresh = false;
   targets.forEach(function(target) {
     target.addDebuff(paramId, turns);
     if (show) this._logWindow.displayActionResults(this._subject, target);
-    if (target.isActor()) refresh = true;
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -937,16 +945,16 @@ BattleManager.actionAddState = function(actionName, actionArgs) {
   } else {
     return true;
   }
-  var refresh = false;
   targets.forEach(function(target) {
     for (var i = 0; i < states.length; ++i) {
       stateId = states[i];
+      if (stateId === target.deathStateId()) {
+        if (target._prevImmortalState === false) target.forceRemoveImmortal();
+      }
       target.addState(stateId);
       if (show) this._logWindow.displayActionResults(this._subject, target);
-      if (target.isActor()) refresh = true;
     }
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -1018,7 +1026,8 @@ BattleManager.actionBgsPlay = function(actionArgs) {
 
 BattleManager.actionCollapse = function(actionArgs) {
   var targets = this.makeActionTargets(actionArgs[0]);
-  var force = (actionArgs[1].toUpperCase() === 'FORCE');
+  var force = false;
+  if (actionArgs[1]) var force = (actionArgs[1].toUpperCase() === 'FORCE');
   targets.forEach(function(target) {
     if (force) {
       target.removeImmortal();
@@ -1193,7 +1202,6 @@ BattleManager.actionHpModify = function(actionName, actionArgs) {
       if (actionArg.toUpperCase() === 'SHOW') show = true;
     }
     var value;
-    var refresh = false;
     targets.forEach(function(target) {
       target.clearResult();
       value = percent ? (target.mhp * change * 0.01) : change;
@@ -1201,10 +1209,8 @@ BattleManager.actionHpModify = function(actionName, actionArgs) {
       if (show) {
         target.startDamagePopup();
         this._logWindow.displayActionResults(this._subject, target);
-        if (target.isActor()) refresh = true;
       }
     }, this);
-    if (refresh) BattleManager.refreshStatus();
     return true;
 };
 
@@ -1258,7 +1264,6 @@ BattleManager.actionMpModify = function(actionName, actionArgs) {
       if (actionArg.toUpperCase() === 'SHOW') show = true;
     }
     var value;
-    var refresh = false;
     targets.forEach(function(target) {
       target.clearResult();
       value = percent ? (target.mmp * change * 0.01) : change;
@@ -1266,10 +1271,8 @@ BattleManager.actionMpModify = function(actionName, actionArgs) {
       if (show) {
         target.startDamagePopup();
         this._logWindow.displayActionResults(this._subject, target);
-        if (target.isActor()) refresh = true;
       }
     }, this);
-    if (refresh) BattleManager.refreshStatus();
     return true;
 };
 
@@ -1292,15 +1295,12 @@ BattleManager.actionRemoveBuff = function(actionName, actionArgs) {
     return true;
   }
   if (paramId < 0) return true;
-  var refresh = false;
   targets.forEach(function(target) {
     if (target.isBuffAffected(paramId)) {
       target.removeBuff(paramId);
       if (show) this._logWindow.displayActionResults(this._subject, target);
-      if (target.isActor()) refresh = true;
     }
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -1318,15 +1318,12 @@ BattleManager.actionRemoveDebuff = function(actionName, actionArgs) {
     return true;
   }
   if (paramId < 0) return true;
-  var refresh = false;
   targets.forEach(function(target) {
     if (target.isDebuffAffected(paramId)) {
       target.removeBuff(paramId);
       if (show) this._logWindow.displayActionResults(this._subject, target);
-      if (target.isActor()) refresh = true;
     }
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -1344,18 +1341,15 @@ BattleManager.actionRemoveState = function(actionName, actionArgs) {
   } else {
     return true;
   }
-  var refresh = false;
   targets.forEach(function(target) {
     for (var i = 0; i < states.length; ++i) {
       stateId = states[i];
       if (target.isStateAffected(stateId)) {
         target.removeState(stateId);
         if (show) this._logWindow.displayActionResults(this._subject, target);
-        if (target.isActor()) refresh = true;
       }
     }
   }, this);
-  if (refresh) BattleManager.refreshStatus();
   return true;
 };
 
@@ -1455,7 +1449,6 @@ BattleManager.actionTpModify = function(actionName, actionArgs) {
       if (actionArg.toUpperCase() === 'SHOW') show = true;
     }
     var value;
-    var refresh = false;
     targets.forEach(function(target) {
       target.clearResult();
       value = percent ? (target.maxTp() * change * 0.01) : change;
@@ -1463,10 +1456,8 @@ BattleManager.actionTpModify = function(actionName, actionArgs) {
       if (show) {
         target.startDamagePopup();
         this._logWindow.displayActionResults(this._subject, target);
-        if (target.isActor()) refresh = true;
       }
     }, this);
-    if (refresh) BattleManager.refreshStatus();
     return true;
 };
 

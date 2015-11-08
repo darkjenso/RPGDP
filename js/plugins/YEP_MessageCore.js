@@ -11,7 +11,7 @@ Yanfly.Message = Yanfly.Message || {};
 
 //=============================================================================
  /*:
- * @plugindesc v1.03a Adds more features to the Message Window to customized
+ * @plugindesc v1.04 Adds more features to the Message Window to customized
  * the way your messages appear and functions.
  * @author Yanfly Engine Plugins
  *
@@ -276,7 +276,8 @@ Yanfly.Message = Yanfly.Message || {};
  * Changelog
  * ============================================================================
  *
- * Version 1.03a:
+ * Version 1.04:
+ * - Fixed a bug that captured too many text codes with the namebox window.
  * - Timed Name Window's closing speed with main window's closing speed.
  *
  * Verison 1.03:
@@ -573,7 +574,7 @@ Window_Base.prototype.escapeIconItem = function(n, database) {
 };
 
 Window_Base.prototype.obtainEscapeString = function(textState) {
-    var arr = /^\<(.*)\>/.exec(textState.text.slice(textState.index));
+    var arr = /^\<(.*?)\>/.exec(textState.text.slice(textState.index));
     if (arr) {
         textState.index += arr[0].length;
         return String(arr[0].slice(1, arr[0].length - 1));
@@ -1036,28 +1037,28 @@ Window_Message.prototype.convertEscapeCharacters = function(text) {
 };
 
 Window_Message.prototype.convertNameBox = function(text) {
-		text = text.replace(/\x1bN\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 1);
 		}, this);
-		text = text.replace(/\x1bN1\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN1\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 1);
 		}, this);
-		text = text.replace(/\x1bN2\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN2\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 2);
 		}, this);
-		text = text.replace(/\x1bN3\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN3\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 3);
 		}, this);
-		text = text.replace(/\x1bNC\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bNC\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 3);
 		}, this);
-		text = text.replace(/\x1bN4\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN4\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 4);
 		}, this);
-		text = text.replace(/\x1bN5\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bN5\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 5);
 		}, this);
-		text = text.replace(/\x1bNR\<(.*)\>/gi, function() {
+		text = text.replace(/\x1bNR\<(.*?)\>/gi, function() {
 				return Yanfly.nameWindow.refresh(arguments[1], 5);
 		}, this);
     return text;

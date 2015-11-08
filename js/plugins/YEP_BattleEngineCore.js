@@ -11,7 +11,7 @@ Yanfly.BEC = Yanfly.BEC || {};
 
 //=============================================================================
  /*:
- * @plugindesc v1.11 Have more control over the flow of the battle system
+ * @plugindesc v1.12b Have more control over the flow of the battle system
  * with this plugin and alter various aspects to your liking.
  * @author Yanfly Engine Plugins
  *
@@ -425,6 +425,12 @@ Yanfly.BEC = Yanfly.BEC || {};
  * its speed calculation formula removed, too, making AGI actually worthwhile
  * as a tactical parameter.
  *
+ * Skill and Item Notetag:
+ *   <speed: +x>
+ *   <speed: -x>
+ *   This lets you break past the editor's limit of -2000 and 2000 allowing you
+ *   to set the speed of your actions with more control.
+ *
  * ============================================================================
  * Multiple Hits
  * ============================================================================
@@ -550,6 +556,15 @@ Yanfly.BEC = Yanfly.BEC || {};
  * ============================================================================
  * Changelog
  * ============================================================================
+ *
+ * Version 1.12b:
+ * - If the Battle HUD has been hidden for whatever reason during the victory
+ * sequence, it will be returned.
+ * - Added <speed: +x> and <speed: -x> notetags to break past editor limits.
+ * - Added new conditions where the battle won't end until all action sequences
+ * have been fulfilled.
+ * - Victory phase doesn't immediately display level up changes in battle
+ * status window.
  *
  * Version 1.11:
  * - Fixed a bug that didn't show HP/MP Regeneration.
@@ -906,6 +921,7 @@ DataManager.processBECNotetags1 = function(group) {
 
 DataManager.processBECNotetags2 = function(group) {
 	var note1 = /<(?:ACTION COPY):[ ](.*):[ ]*(\d+)>/i;
+  var note2 = /<(?:SPEED):[ ]([\+\-]\d+)>/i;
 	for (var n = 1; n < group.length; n++) {
 		var obj = group[n];
 		var notedata = obj.note.split(/[\r\n]+/);
@@ -927,7 +943,9 @@ DataManager.processBECNotetags2 = function(group) {
 					obj.followActions = target.followActions.slice();
 					obj.finishActions = target.finishActions.slice();
 				}
-			}
+			} else if (line.match(note2)) {
+        obj.speed = parseInt(RegExp.$1);
+      }
 		}
 	}
 };
@@ -1129,14 +1147,19 @@ BattleManager.changeActor = function(newActorIndex, lastActorActionState) {
 
 Yanfly.BEC.BattleManager_checkBattleEnd = BattleManager.checkBattleEnd;
 BattleManager.checkBattleEnd = function() {
-    if (this._phase === 'actionList' || this._phase === 'actionTargetList' ||
-			$gameTroop.isEventRunning()) return false;
+    if (this._phase === 'actionList') return false;
+    if (this._phase === 'actionTargetList') return false;
+    if (this._phase === 'action') return false;
+    if (this._phase === 'phaseChange') return false;
+    if ($gameTroop.isEventRunning()) return false;
     return Yanfly.BEC.BattleManager_checkBattleEnd.call(this);
 };
 
 Yanfly.BEC.BattleManager_processVictory = BattleManager.processVictory;
 BattleManager.processVictory = function() {
     this._logWindow.clear();
+    this._victoryPhase = true;
+    if (this._windowLayer) this._windowLayer.x = 0;
 		Yanfly.BEC.BattleManager_processVictory.call(this);
 };
 
@@ -2428,6 +2451,13 @@ Game_BattlerBase.prototype.isImmortal = function() {
     return this._immortalState;
 };
 
+Yanfly.BEC.Game_BattlerBase_paySkillCost =
+    Game_BattlerBase.prototype.paySkillCost;
+Game_BattlerBase.prototype.paySkillCost = function(skill) {
+    this.requestStatusRefresh();
+    Yanfly.BEC.Game_BattlerBase_paySkillCost.call(this, skill);
+};
+
 //=============================================================================
 // Game_Battler
 //=============================================================================
@@ -3587,6 +3617,7 @@ Window_BattleStatus.prototype.numVisibleRows = function() {
 };
 
 Window_BattleStatus.prototype.updateStatusRequests = function() {
+    if (BattleManager._victoryPhase) return;
     for (var i = 0; i < $gameParty.battleMembers().length; ++i) {
       var actor = $gameParty.battleMembers()[i];
       if (!actor) continue;
